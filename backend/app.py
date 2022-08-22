@@ -29,6 +29,53 @@ args = parser.parse_args()
 @app.route("/upscale", methods=["POST"])
 @cross_origin()
 def esrgan_api():
+    model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)
+    model_name = "RealESRGAN_x4plus"
+    model_path = os.path.join('./dalle-playground/backend/pretrained_models', model_name + '.pth')
+    netscale = 4
+    from realesrgan import RealESRGANer
+    upsampler = RealESRGANer(
+        scale=netscale,
+        model_path=model_path,
+        model=model,
+        tile=0,
+        tile_pad=10,
+        pre_pad=0,
+        half=True,
+        gpu_id=None)
+
+    face_enhancer = GFPGANer(
+        model_path='https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth',
+        upscale=4,
+        arch='clean',
+        channel_multiplier=2,
+        bg_upsampler=upsampler)
+
+    if os.path.isfile(args.input):
+        paths = [args.input]
+    else:
+        paths = sorted(glob.glob(os.path.join(args.input, '*')))
+
+    for idx, path in enumerate(paths):
+        imgname, extension = os.path.splitext(os.path.basename(path))
+        print('Testing', idx, imgname)
+
+        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        if len(img.shape) == 3 and img.shape[2] == 4:
+            img_mode = 'RGBA'
+        else:
+            img_mode = None
+
+        try:
+            if args.face_enhance:
+                _, _, output = face_enhancer.enhance(img, has_aligned=False, only_center_face=False, paste_back=True)
+            else:
+                output, _ = upsampler.enhance(img, outscale=args.outscale)
+        except RuntimeError as error:
+            print('Error', error)
+            print('If you encounter CUDA out of memory, try to set --tile with a smaller number.')
+            
+            
     json_data = request.get_json(force=True)
     img_formay = "JPEG" # args.img_format
     buffered = BytesIO()
