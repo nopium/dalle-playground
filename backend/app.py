@@ -26,6 +26,20 @@ parser.add_argument("--img_format", type = str.lower, default = "JPEG", help = "
 parser.add_argument("--output_dir", type = str, default = DEFAULT_IMG_OUTPUT_DIR, help = "Customer directory for generated images")
 args = parser.parse_args()
 
+@app.route("/upscale", methods=["POST"])
+@cross_origin()
+def esrgan_api():
+    json_data = request.get_json(force=True)
+    img_formay = "JPEG" # args.img_format
+    buffered = BytesIO()
+    img.save(buffered, format=img_format)
+    returned_generated_images = []
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    returned_generated_images.append(img_str)
+    response = {'upscaledImgs': returned_generated_images, 'generatedImgsFormat': img_format}
+    return jsonify(response)
+
+
 @app.route("/dalle", methods=["POST"])
 @cross_origin()
 def generate_images_api():
